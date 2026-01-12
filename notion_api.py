@@ -56,26 +56,12 @@ class NotionAPI:
     def append_children(self, block_id, children):
         return self._request("PATCH", f"/blocks/{block_id}/children", {"children": children})
 
+    def get_children(self, block_id):
+        return self._request("GET", f"/blocks/{block_id}/children")
+
+    def delete_block(self, block_id):
+        return self._request("DELETE", f"/blocks/{block_id}")
+
 # Test the helper
 if __name__ == "__main__":
-    key = os.environ.get("NOTION_KEY")
-    # Use the child page created earlier for testing
-    parent = "2e63373b-e1bf-814b-91a8-e39d8ff15bc0"
-
-    api = NotionAPI(key)
-    print("Testing custom NotionAPI class...")
-    try:
-        db = api.create_database(
-            parent,
-            "Python Urllib DB",
-            {
-                "Name": {"title": {}},
-                "TestProp": {"select": {"options": [{"name": "It Works!"}]}}
-            }
-        )
-        if "properties" in db and "TestProp" in db["properties"]:
-            print("✅ SUCCESS: Database created with properties using urllib.")
-        else:
-            print("❌ FAILURE: Properties missing.")
-    except Exception as e:
-        print(f"Test failed: {e}")
+    pass

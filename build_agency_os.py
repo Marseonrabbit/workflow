@@ -1,190 +1,141 @@
 import os
 import sys
-from notion_client import Client
+import json
+from notion_api import NotionAPI
+
+SCHEMA_FILE = "agency_os_schema.json"
 
 class AgencyOSBuilder:
-    def __init__(self, token, parent_page_id):
-        self.client = Client(auth=token)
+    def __init__(self, api, parent_page_id):
+        self.api = api
         self.parent_page_id = parent_page_id
-        self.page_id = None
-        self.urls = {}
+        self.main_page_id = None
+        self.db_ids = {}
+        self.db_urls = {}
+
+        with open(SCHEMA_FILE, "r") as f:
+            self.schema = json.load(f)
 
     def build(self):
         print("🚀 Starting Agency OS creation...")
+
+        # 1. Create Main Page
         self.create_main_page()
-        self.create_sub_databases()
-        self.add_quick_links()
-        self.create_and_populate_team_db()
+
+        # 2. Create Databases (Order matters for relations, but we will patch relations later if needed?
+        # Actually Notion requires the related DB to exist.
+        # Dependency Order: Team -> Clients -> Projects -> Tasks.
+        # Finance and SOPs are independent.
+
+        self.create_database("Team")
+        self.create_database("Clients")
+        self.create_database("Projects")
+        self.create_database("Tasks")
+        self.create_database("Finance")
+        self.create_database("SOPs")
+
+        # 3. Create Dashboard content
+        self.create_dashboard()
+
         print("\n🎉 Agency OS creation complete!")
-        print(f"Go to: {self.urls.get('Agency OS')}")
 
     def create_main_page(self):
         print("Creating 'Agency OS' page...")
         try:
-            agency_os_page = self.client.pages.create(
-                parent={"page_id": self.parent_page_id},
-                icon={"type": "emoji", "emoji": "💼"},
-                properties={
-                    "title": {
-                        "title": [{"text": {"content": "Agency OS"}}]
-                    }
-                }
-            )
-            self.page_id = agency_os_page["id"]
-            self.urls['Agency OS'] = agency_os_page['url']
-            print(f"✅ Created 'Agency OS' page: {self.page_id}")
+            resp = self.api.create_page(self.parent_page_id, "Agency OS", icon={"type": "emoji", "emoji": "⚡"})
+            self.main_page_id = resp["id"]
+            print(f"✅ Created 'Agency OS' page: {self.main_page_id}")
         except Exception as e:
             print(f"❌ Failed to create main page: {e}")
-            raise e
+            sys.exit(1)
 
-    def create_sub_databases(self):
-        # Create auxiliary databases as sub-pages
-        db_configs = [
-            {"name": "Projects", "emoji": "💼"},
-            {"name": "Tasks", "emoji": "📋"},
-            {"name": "Meetings", "emoji": "👥"},
-            {"name": "Finance", "emoji": "💳"}
-        ]
+    def create_database(self, db_name):
+        print(f"Creating '{db_name}' database...")
+        config = self.schema[db_name]
 
-        print("\nCreating Sub-Databases...")
-        for config in db_configs:
-            name = config["name"]
-            emoji = config["emoji"]
+        # Prepare properties, resolving placeholders
+        properties = config["properties"]
+        for prop_name, prop_config in properties.items():
+            if "relation" in prop_config:
+                target_placeholder = prop_config["relation"]["database_id"]
+                target_db_name = target_placeholder.replace("PLACEHOLDER_", "").replace("_DB", "").title()
 
-            try:
-                db = self.client.databases.create(
-                    parent={"page_id": self.page_id},
-                    title=[{"type": "text", "text": {"content": name}}],
-                    icon={"type": "emoji", "emoji": emoji},
-                    properties={
-                        "Name": {"title": {}}
-                    },
-                    is_inline=False
-                )
-                self.urls[name] = db["url"]
-                print(f"   - Created '{name}' database.")
-            except Exception as e:
-                print(f"   ! Failed to create '{name}' database: {e}")
+                # Check mapping (Team, Clients, Projects)
+                if target_db_name == "Team" and "Team" in self.db_ids:
+                    prop_config["relation"]["database_id"] = self.db_ids["Team"]
+                elif target_db_name == "Clients" and "Clients" in self.db_ids:
+                    prop_config["relation"]["database_id"] = self.db_ids["Clients"]
+                elif target_db_name == "Projects" and "Projects" in self.db_ids:
+                    prop_config["relation"]["database_id"] = self.db_ids["Projects"]
+                else:
+                    print(f"   ⚠️ Warning: Relation target '{target_db_name}' not found yet. Skipping relation.")
+                    # Fallback to rich_text if relation fails? No, just skip the property or relation logic
+                    # Notion API will error if ID is invalid.
+                    # We will create without relation first if it's missing, but given the order, it should be fine.
+                    # Exception: Tasks -> Assignee (Team) is fine. Tasks -> Project (Projects) is fine.
+                    # Projects -> Client (Clients) is fine.
+                    # Projects -> Team Lead (Team) is fine.
+                    pass
 
-    def add_quick_links(self):
-        print("\nAdding 'Quick Links' section...")
+        try:
+            db = self.api.create_database(
+                parent_id=self.main_page_id,
+                title=db_name,
+                properties=properties,
+                is_inline=True, # Agency OS usually has inline databases on dashboard
+                icon=config.get("icon")
+            )
+            self.db_ids[db_name] = db["id"]
+            self.db_urls[db_name] = db.get("url")
+            print(f"   ✅ Created '{db_name}' database.")
+        except Exception as e:
+            print(f"   ❌ Failed to create '{db_name}': {e}")
+            # If relation failed, maybe try creating without relation?
+            # For simplicity, we assume dependencies are met by order.
 
-        # Build paragraph with links
-        db_names = ["Projects", "Tasks", "Meetings", "Finance"]
+    def create_dashboard(self):
+        print("\nCreating Dashboard Layout...")
 
-        rich_text = []
-        for i, name in enumerate(db_names):
-            if name in self.urls:
-                emoji_map = {"Projects": "💼", "Tasks": "📋", "Meetings": "👥", "Finance": "💳"}
-                label = f"Add {name} {emoji_map.get(name, '')}"
-
-                rich_text.append({
-                    "text": {"content": label, "link": {"url": self.urls[name]}}
-                })
-
-                if i < len(db_names) - 1:
-                    rich_text.append({"text": {"content": "    "}})
-
-        quick_links_blocks = [
+        # Add a welcome header and some callouts
+        children = [
             {
                 "object": "block",
-                "type": "heading_2",
-                "heading_2": {
-                    "rich_text": [{"text": {"content": "Quick Links"}}],
-                    "color": "blue"
+                "type": "callout",
+                "callout": {
+                    "rich_text": [{"text": {"content": "Welcome to your Agency OS. Manage your projects, clients, and team here."}}],
+                    "icon": {"emoji": "👋"},
+                    "color": "gray_background"
                 }
-            },
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": rich_text
-                }
-            },
-            {
-                "object": "block",
-                "type": "divider",
-                "divider": {}
             },
             {
                 "object": "block",
                 "type": "heading_2",
                 "heading_2": {
-                    "rich_text": [{"text": {"content": "Team Members"}}],
-                    "color": "blue"
+                    "rich_text": [{"text": {"content": "Quick Access"}}]
                 }
             }
         ]
 
-        try:
-            self.client.blocks.children.append(
-                block_id=self.page_id,
-                children=quick_links_blocks
-            )
-            print("✅ Added Quick Links.")
-        except Exception as e:
-            print(f"❌ Failed to add Quick Links: {e}")
-
-    def create_and_populate_team_db(self):
-        print("\nCreating 'Team' database (Inline)...")
-        try:
-            team_db = self.client.databases.create(
-                parent={"page_id": self.page_id},
-                title=[{"type": "text", "text": {"content": "Team"}}],
-                properties={
-                    "Name": {"title": {}},
-                    "Email": {"email": {}},
-                    "Role": {
-                        "select": {
-                            "options": [
-                                {"name": "Graphic Designer", "color": "purple"},
-                                {"name": "UI Designer", "color": "orange"},
-                                {"name": "UX Designer", "color": "yellow"},
-                                {"name": "Website's Designer", "color": "pink"},
-                                {"name": "CEO", "color": "red"}
-                            ]
-                        }
-                    },
-                    "Project": {"rich_text": {}},
-                },
-                is_inline=True
-            )
-            team_db_id = team_db["id"]
-            print(f"✅ Created 'Team' database: {team_db_id}")
-
-            self._populate_team_data(team_db_id)
-
-        except Exception as e:
-            print(f"❌ Failed to create/populate Team database: {e}")
-
-    def _populate_team_data(self, db_id):
-        team_members = [
-            {"name": "Sara", "email": "heyelgarouri@gmail.com", "role": "Graphic Designer", "project": "Design a Post for noon"},
-            {"name": "Rayan", "email": "heyelgarouri@gmail.com", "role": "UI Designer", "project": "Design a Post for noon"},
-            {"name": "Ismail", "email": "heyelgarouri@gmail.com", "role": "UX Designer", "project": "UX Design for a Mobile Bank"},
-            {"name": "Adrain", "email": "heyelgarouri@gmail.com", "role": "Website's Designer", "project": "UX Design for a Mobile Bank"},
-            {"name": "Mark", "email": "heyelgarouri@gmail.com", "role": "UX Designer", "project": "Design A e-commerce website Shopify"},
-            {"name": "Heyismail", "email": "heyelgarouri@gmail.com", "role": "CEO", "project": "Design A e-commerce website Shopify"},
-        ]
-
-        print("Populating 'Team' database...")
-        for member in team_members:
-            try:
-                self.client.pages.create(
-                    parent={"database_id": db_id},
-                    properties={
-                        "Name": {"title": [{"text": {"content": member["name"]}}]},
-                        "Email": {"email": member["email"]},
-                        "Role": {"select": {"name": member["role"]}},
-                        "Project": {"rich_text": [{"text": {"content": member["project"]}}]}
+        # Create links to databases
+        for name, url in self.db_urls.items():
+            if url:
+                children.append({
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {"text": {"content": f"🔗 Go to {name}", "link": {"url": url}}}
+                        ]
                     }
-                )
-                print(f"   - Added {member['name']}")
-            except Exception as e:
-                print(f"   ! Failed to add {member['name']}: {e}")
+                })
+
+        try:
+            self.api.append_children(self.main_page_id, children)
+            print("✅ Dashboard elements added.")
+        except Exception as e:
+            print(f"❌ Failed to add dashboard elements: {e}")
 
 if __name__ == "__main__":
-    print("--- Notion Template Builder: Agency OS ---")
     key = os.environ.get("NOTION_KEY")
     page_id = os.environ.get("NOTION_PAGE_ID")
 
@@ -192,8 +143,6 @@ if __name__ == "__main__":
         print("Error: Environment variables NOTION_KEY and NOTION_PAGE_ID must be set.")
         sys.exit(1)
 
-    builder = AgencyOSBuilder(key, page_id)
-    try:
-        builder.build()
-    except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
+    api = NotionAPI(key)
+    builder = AgencyOSBuilder(api, page_id)
+    builder.build()

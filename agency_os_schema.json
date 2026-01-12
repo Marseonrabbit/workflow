@@ -1,0 +1,142 @@
+{
+    "Team": {
+        "icon": {"type": "emoji", "emoji": "👥"},
+        "properties": {
+            "Name": {"title": {}},
+            "Role": {
+                "select": {
+                    "options": [
+                        {"name": "CEO", "color": "red"},
+                        {"name": "Designer", "color": "purple"},
+                        {"name": "Developer", "color": "blue"},
+                        {"name": "Marketer", "color": "orange"}
+                    ]
+                }
+            },
+            "Email": {"email": {}},
+            "Phone": {"phone_number": {}}
+        }
+    },
+    "Clients": {
+        "icon": {"type": "emoji", "emoji": "🏢"},
+        "properties": {
+            "Name": {"title": {}},
+            "Status": {
+                "select": {
+                    "options": [
+                        {"name": "Lead", "color": "yellow"},
+                        {"name": "Active", "color": "green"},
+                        {"name": "Churned", "color": "red"}
+                    ]
+                }
+            },
+            "Contact Person": {"rich_text": {}},
+            "Email": {"email": {}},
+            "Value": {"number": {"format": "dollar"}},
+            "Last Contact": {"date": {}}
+        }
+    },
+    "Projects": {
+        "icon": {"type": "emoji", "emoji": "💼"},
+        "properties": {
+            "Name": {"title": {}},
+            "Status": {
+                "select": {
+                    "options": [
+                        {"name": "Planning", "color": "gray"},
+                        {"name": "In Progress", "color": "blue"},
+                        {"name": "Review", "color": "orange"},
+                        {"name": "Completed", "color": "green"}
+                    ]
+                }
+            },
+            "Client": {"relation": {"database_id": "PLACEHOLDER_CLIENTS_DB", "single_property": {}}},
+            "Priority": {
+                "select": {
+                    "options": [
+                        {"name": "Low", "color": "gray"},
+                        {"name": "Medium", "color": "yellow"},
+                        {"name": "High", "color": "red"}
+                    ]
+                }
+            },
+            "Timeline": {"date": {}},
+            "Team Lead": {"relation": {"database_id": "PLACEHOLDER_TEAM_DB", "single_property": {}}}
+        }
+    },
+    "Tasks": {
+        "icon": {"type": "emoji", "emoji": "✅"},
+        "properties": {
+            "Name": {"title": {}},
+            "Status": {
+                "status": {}
+            },
+            "Project": {"relation": {"database_id": "PLACEHOLDER_PROJECTS_DB", "single_property": {}}},
+            "Assignee": {"relation": {"database_id": "PLACEHOLDER_TEAM_DB", "single_property": {}}},
+            "Due Date": {"date": {}},
+            "Priority": {
+                "select": {
+                    "options": [
+                        {"name": "P1", "color": "red"},
+                        {"name": "P2", "color": "yellow"},
+                        {"name": "P3", "color": "blue"}
+                    ]
+                }
+            }
+        }
+    },
+    "Finance": {
+        "icon": {"type": "emoji", "emoji": "💰"},
+        "properties": {
+            "Name": {"title": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "Income", "color": "green"},
+                        {"name": "Expense", "color": "red"}
+                    ]
+                }
+            },
+            "Amount": {"number": {"format": "dollar"}},
+            "Date": {"date": {}},
+            "Category": {
+                "select": {
+                    "options": [
+                        {"name": "Project Fee", "color": "green"},
+                        {"name": "Retainer", "color": "green"},
+                        {"name": "Software", "color": "red"},
+                        {"name": "Contractors", "color": "red"},
+                        {"name": "Office", "color": "gray"}
+                    ]
+                }
+            },
+            "Invoice Status": {
+                "select": {
+                    "options": [
+                        {"name": "Draft", "color": "gray"},
+                        {"name": "Sent", "color": "yellow"},
+                        {"name": "Paid", "color": "green"},
+                        {"name": "Overdue", "color": "red"}
+                    ]
+                }
+            }
+        }
+    },
+    "SOPs": {
+        "icon": {"type": "emoji", "emoji": "📚"},
+        "properties": {
+            "Name": {"title": {}},
+            "Category": {
+                "select": {
+                    "options": [
+                        {"name": "Admin", "color": "gray"},
+                        {"name": "Design", "color": "purple"},
+                        {"name": "Development", "color": "blue"},
+                        {"name": "Marketing", "color": "orange"}
+                    ]
+                }
+            },
+            "Last Updated": {"date": {}}
+        }
+    }
+}

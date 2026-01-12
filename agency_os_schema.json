@@ -6,15 +6,16 @@
             "Role": {
                 "select": {
                     "options": [
-                        {"name": "CEO", "color": "red"},
-                        {"name": "Designer", "color": "purple"},
-                        {"name": "Developer", "color": "blue"},
-                        {"name": "Marketer", "color": "orange"}
+                        {"name": "Ceo", "color": "red"},
+                        {"name": "Graphic Designer", "color": "purple"},
+                        {"name": "Ui Designer", "color": "orange"},
+                        {"name": "Ux designer", "color": "blue"},
+                        {"name": "Website's Designer", "color": "pink"}
                     ]
                 }
             },
             "Email": {"email": {}},
-            "Phone": {"phone_number": {}}
+            "Current Project": {"rich_text": {}}
         }
     },
     "Clients": {
@@ -69,7 +70,13 @@
         "properties": {
             "Name": {"title": {}},
             "Status": {
-                "status": {}
+                "select": {
+                     "options": [
+                        {"name": "To Do", "color": "gray"},
+                        {"name": "In Progress", "color": "blue"},
+                        {"name": "Done", "color": "green"}
+                    ]
+                }
             },
             "Project": {"relation": {"database_id": "PLACEHOLDER_PROJECTS_DB", "single_property": {}}},
             "Assignee": {"relation": {"database_id": "PLACEHOLDER_TEAM_DB", "single_property": {}}},
@@ -83,6 +90,15 @@
                     ]
                 }
             }
+        }
+    },
+    "Meetings": {
+        "icon": {"type": "emoji", "emoji": "📅"},
+        "properties": {
+            "Name": {"title": {}},
+            "Date": {"date": {}},
+            "Attendees": {"relation": {"database_id": "PLACEHOLDER_TEAM_DB", "single_property": {}}},
+            "Link": {"url": {}}
         }
     },
     "Finance": {

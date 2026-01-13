@@ -33,6 +33,17 @@
             },
             "Contact Person": {"rich_text": {}},
             "Email": {"email": {}},
+            "Phone": {"phone_number": {}},
+            "Industry": {
+                "select": {
+                    "options": [
+                        {"name": "Tech", "color": "blue"},
+                        {"name": "Retail", "color": "green"},
+                        {"name": "Finance", "color": "yellow"},
+                        {"name": "Healthcare", "color": "red"}
+                    ]
+                }
+            },
             "Value": {"number": {"format": "dollar"}},
             "Last Contact": {"date": {}}
         }
@@ -153,6 +164,96 @@
                 }
             },
             "Last Updated": {"date": {}}
+        }
+    },
+    "Content Calendar": {
+        "icon": {"type": "emoji", "emoji": "🗓️"},
+        "properties": {
+            "Title": {"title": {}},
+            "Status": {
+                "select": {
+                    "options": [
+                        {"name": "Idea", "color": "gray"},
+                        {"name": "Drafting", "color": "blue"},
+                        {"name": "Review", "color": "yellow"},
+                        {"name": "Published", "color": "green"}
+                    ]
+                }
+            },
+            "Channel": {
+                "select": {
+                    "options": [
+                        {"name": "Instagram", "color": "pink"},
+                        {"name": "LinkedIn", "color": "blue"},
+                        {"name": "Twitter", "color": "blue"},
+                        {"name": "Blog", "color": "orange"}
+                    ]
+                }
+            },
+            "Publish Date": {"date": {}},
+            "URL": {"url": {}}
+        }
+    },
+    "Resources": {
+        "icon": {"type": "emoji", "emoji": "🛠️"},
+        "properties": {
+            "Name": {"title": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "Tool", "color": "blue"},
+                        {"name": "Course", "color": "green"},
+                        {"name": "Book", "color": "brown"},
+                        {"name": "Article", "color": "gray"}
+                    ]
+                }
+            },
+            "Link": {"url": {}},
+            "Cost": {"number": {"format": "dollar"}}
+        }
+    },
+    "Assets": {
+        "icon": {"type": "emoji", "emoji": "🎨"},
+        "properties": {
+            "Name": {"title": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "Logo", "color": "orange"},
+                        {"name": "Font", "color": "gray"},
+                        {"name": "Color Palette", "color": "pink"},
+                        {"name": "Template", "color": "blue"}
+                    ]
+                }
+            },
+            "Link": {"url": {}},
+            "File Type": {
+                "select": {
+                    "options": [
+                        {"name": "PNG", "color": "gray"},
+                        {"name": "SVG", "color": "orange"},
+                        {"name": "PDF", "color": "red"},
+                        {"name": "DOCX", "color": "blue"}
+                    ]
+                }
+            }
+        }
+    },
+    "Services": {
+        "icon": {"type": "emoji", "emoji": "🏷️"},
+        "properties": {
+            "Name": {"title": {}},
+            "Price": {"number": {"format": "dollar"}},
+            "Description": {"rich_text": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "One-off", "color": "blue"},
+                        {"name": "Retainer", "color": "green"},
+                        {"name": "Hourly", "color": "orange"}
+                    ]
+                }
+            }
         }
     }
 }

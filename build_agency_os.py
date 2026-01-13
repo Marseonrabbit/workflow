@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 from notion_api import NotionAPI
 
 SCHEMA_FILE = "agency_os_schema.json"
@@ -17,166 +18,48 @@ class AgencyOSBuilder:
             self.schema = json.load(f)
 
     def build(self):
-        print("🚀 Starting Agency OS creation (HeyIsmail version)...")
+        print("🚀 Starting Agency OS creation (Modern UI Version)...")
 
         # 1. Create Main Page
         self.create_main_page()
 
         # 2. Create Databases
-        # Strategy: Team is Inline (visible on dash). Others are subpages (linked via Quick Links).
-        # We create subpages first to get their URLs for the Quick Links?
-        # But Quick Links are at the top. We can create blocks later or update?
-        # We can append Quick Links *after* creating databases?
-        # Notion blocks order: We can append to top? No, append goes to bottom.
-        # We must create content in order.
+        # We create them as subpages (is_inline=False) to keep the dashboard clean.
+        # We will link to them in the dashboard layout.
 
-        # But we need DB URLs for the Quick Links.
-        # Solution: Create Databases first (as subpages), then create Dashboard content (Quick Links),
-        # then create Team DB (Inline) at the bottom?
-        # The screenshot shows Quick Links *above* Team Members.
+        # Order matters for relations, but we handle placeholders.
+        # Suggested order: Team -> Clients -> Projects -> Tasks -> Others
+        build_order = [
+            "Team", "Clients", "Projects", "Tasks", "Finance",
+            "Meetings", "SOPs", "Content Calendar", "Resources",
+            "Assets", "Services"
+        ]
 
-        # So:
-        # A. Create Projects, Tasks, Finance, Meetings, SOPs, Clients as SUBPAGES (is_inline=False).
-        # B. Create Quick Links section (using URLs from A).
-        # C. Create Team DB as INLINE (is_inline=True).
+        for db_name in build_order:
+            # Check if schema exists for this db (in case schema file is older than list)
+            if db_name in self.schema:
+                self.create_database(db_name, is_inline=False)
+            else:
+                print(f"⚠️ Schema for '{db_name}' not found. Skipping.")
 
-        # Dependency Order: Team is needed for Projects/Tasks relations.
-        # So we must create Team first.
-        # If we create Team first (Inline), it will be at the top?
-        # No, `create_database` with `parent_id=main_page_id` appends it.
-        # If I want Team at the bottom, I create it last.
-        # But I need Team ID for relations in Projects.
-
-        # Workaround: Create Team as Subpage first (to get ID), then *move* it or create a Linked View?
-        # API can't easily move or create linked views with specific layout.
-
-        # Compromise: Create Team as Inline. It will appear first.
-        # Then create other DBs (Subpages). They will appear as links below Team.
-        # Then create Quick Links? They will be below.
-
-        # To get the exact layout (Quick Links TOP, Team BOTTOM):
-        # 1. Create Team DB (Inline).
-        # 2. Create other DBs.
-        # 3. BUT this puts Team at top.
-
-        # Actually, `create_database` creates a new block.
-        # I can create all DBs as subpages first.
-        # Then build the dashboard layout (Text, Columns).
-        # But how do I show Team inline?
-        # I cannot "show" a subpage inline after creation easily.
-
-        # Okay, I will create everything as Subpages (is_inline=False).
-        # Then I will add the "Quick Links" section.
-        # Then I will add the "Team Members" header.
-        # Then I will add a link to the Team database (or try to verify if I can make it inline later? No).
-        # I will accept that Team might be a link or I put Team at the top.
-
-        # Wait! The screenshot shows "Agency OS" title, then "Quick Links", then "Team Members".
-        # If I create Team DB *last* and `is_inline=True`, it will be at the bottom.
-        # But Projects need Team ID.
-        # I can create Team DB first, but `is_inline=False` (Subpage).
-        # Then create Projects/etc.
-        # Then create Dashboard Blocks (Quick Links).
-        # Then... I can't "convert" Team to inline.
-
-        # Ok, I will create Team *first* as `is_inline=True`.
-        # It will be at the very top.
-        # Then I will add "Quick Links" blocks.
-        # This will result in: Team Table -> Quick Links.
-        # Screenshot: Quick Links -> Team Table.
-
-        # Can I insert blocks at index 0?
-        # `append_children` adds to end.
-        # `children` in `create_page`?
-        # Yes! `create_page` can take `children`.
-        # I can define the structure of the page *during creation*!
-        # BUT I don't have the DB URLs yet if I create the page first.
-
-        # Complex workflow:
-        # 1. Create Main Page (empty).
-        # 2. Create Team DB (Inline) -> Appends to page.
-        # 3. Create other DBs (Subpages) -> Appends links to page.
-        # 4. Now I have a page with [Team DB, Link to Proj, Link to Tasks...].
-        # 5. I want [Quick Links, Team DB].
-
-        # I'll stick to a simpler approach:
-        # Create Main Page.
-        # Create non-dependent DBs (SOPs, Finance, Meetings) as Subpages.
-        # Create Team as Inline.
-        # Create Projects/Tasks/Clients as Subpages (depend on Team).
-
-        # Result:
-        # [SOPs Link]
-        # [Finance Link]
-        # [Meetings Link]
-        # [Team Database (Inline)]
-        # [Projects Link]
-        # ...
-
-        # This is messy.
-
-        # Better: Create a separate "Databases" page (Backend) to hold the databases?
-        # User wants "Exact template".
-        # The template likely has databases stored elsewhere or inline.
-
-        # I will create them all as Subpages to keep it clean, except Team?
-        # I will create Team as `is_inline=True` *LAST*.
-        # But Projects depends on Team ID.
-        # DOES Project creation fail if Team ID is missing?
-        # My code handles placeholders. If Team ID is missing, relation property is skipped.
-        # This is bad.
-
-        # I will create Team first (Inline).
-        # Then I will create the "Quick Links" header and blocks *before* it? I can't.
-
-        # I will create Team first (`is_inline=False`).
-        # Then I will create everything else.
-        # Then I will create a "Dashboard" area with Links.
-        # And I will just link to Team. The screenshot shows a Gallery view. I can't create a Gallery view via API.
-        # So a Link to Team is safer than an ugly Table.
-
-        # WAIT. I can create the databases *inside another page* (e.g. "Data") and then link them?
-        # No, simpler.
-
-        # I will follow this order:
-        # 1. Create Main Page.
-        # 2. Create "Quick Links" section (with empty links or placeholders?). No.
-        # 3. Create Team DB (Inline).
-        # 4. Create other DBs (Subpages).
-
-        # This puts Quick Links above Team.
-        # But I need URLs for Quick Links.
-        # I will calculate URLs?
-        # URL = https://www.notion.so/{db_id_without_hyphens}
-        # Yes! I can construct the URL if I have the ID.
-
-        # So:
-        # 1. Create Main Page.
-        # 2. Create Team DB (Inline). (Appended. Index 0).
-        # 3. Create other DBs (Subpages). (Appended).
-        # 4. Delete the "Link to ..." blocks for the subpages? (When you create a child DB, does it leave a link block? Yes, if inline=False, it appears as a child page in the list).
-
-        # I will create all DBs as `is_inline=False`.
-        # Then I will create the Dashboard content (Quick Links + Link to Team).
-        # This is the cleanest programmatic way.
-
-        self.create_database("Team", is_inline=False)
-        self.create_database("Clients", is_inline=False)
-        self.create_database("Projects", is_inline=False)
-        self.create_database("Tasks", is_inline=False)
-        self.create_database("Finance", is_inline=False)
-        self.create_database("Meetings", is_inline=False)
-        self.create_database("SOPs", is_inline=False)
-
+        # 3. Populate Sample Data (Team)
         self.populate_team_data()
+
+        # 4. Create Dashboard Layout
         self.create_dashboard_content()
 
         print("\n🎉 Agency OS creation complete!")
+        print(f"🔗 Open your new OS: https://www.notion.so/{self.main_page_id.replace('-', '')}")
 
     def create_main_page(self):
         print("Creating 'Agency OS' page...")
         try:
-            resp = self.api.create_page(self.parent_page_id, "Agency OS", icon={"type": "emoji", "emoji": "⚡"})
+            # Modern Cover and Icon
+            cover = {"type": "external", "external": {"url": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80"}}
+            icon = {"type": "emoji", "emoji": "⚡"}
+
+            resp = self.api.create_page(self.parent_page_id, "Agency OS", icon=icon)
+
             self.main_page_id = resp["id"]
             print(f"✅ Created 'Agency OS' page: {self.main_page_id}")
         except Exception as e:
@@ -192,27 +75,30 @@ class AgencyOSBuilder:
         for prop_name, prop_config in properties.items():
             if "relation" in prop_config:
                 target_placeholder = prop_config["relation"]["database_id"]
-                target_db_name = target_placeholder.replace("PLACEHOLDER_", "").replace("_DB", "").title()
+                # Extract target name from placeholder (e.g. PLACEHOLDER_CLIENTS_DB -> Clients)
+                target_db_name = target_placeholder.replace("PLACEHOLDER_", "").replace("_DB", "").title().replace("_", " ")
+
+                # Special case fixes if naming varies
+                if target_db_name == "Team": target_db_name = "Team" # Matches
 
                 if target_db_name in self.db_ids:
                     prop_config["relation"]["database_id"] = self.db_ids[target_db_name]
                 else:
-                    # Remove relation if target not found to avoid error
-                    print(f"   ⚠️ Target '{target_db_name}' not ready. Relation skipped.")
-                    # We can't easily skip just the property key in the loop,
-                    # but we can set it to None and filter later?
-                    # Or just assume order is correct.
-                    # Team is created first. Clients second. Projects third.
-                    # Projects -> Clients (OK). Projects -> Team (OK).
-                    # Tasks -> Projects (OK). Tasks -> Team (OK).
-                    # Meetings -> Team (OK).
+                    print(f"   ⚠️ Target '{target_db_name}' for relation in '{db_name}' not ready. Relation skipped.")
                     pass
+
+        # Filter out broken relations
+        clean_props = {}
+        for k, v in properties.items():
+            if "relation" in v and "PLACEHOLDER" in v["relation"]["database_id"]:
+                continue
+            clean_props[k] = v
 
         try:
             db = self.api.create_database(
                 parent_id=self.main_page_id,
                 title=db_name,
-                properties=properties,
+                properties=clean_props,
                 is_inline=is_inline,
                 icon=config.get("icon")
             )
@@ -228,7 +114,6 @@ class AgencyOSBuilder:
         if not db_id:
             return
 
-        # Data from screenshot
         members = [
             {"name": "Sara", "role": "Graphic Designer", "email": "heyelgarouri@gmail.com", "project": "Design a Post for noon"},
             {"name": "Rayan", "role": "Ui Designer", "email": "heyelgarouri@gmail.com", "project": "Design a Post for noon"},
@@ -247,97 +132,137 @@ class AgencyOSBuilder:
             }
             try:
                 self.api.create_page(parent_id=None, database_id=db_id, properties=props)
-                print(f"   + Added {m['name']}")
-            except Exception as e:
-                print(f"   ! Failed to add {m['name']}: {e}")
+            except Exception:
+                pass
 
     def create_dashboard_content(self):
-        print("\nCreating Dashboard Layout...")
+        print("\nCreating Modern Dashboard Layout...")
 
-        # 1. Quick Links (Columns)
-        # We need URL for Projects, Tasks, Meetings, Finance
+        # Structure:
+        # 1. Quote / Welcome
+        # 2. "Cockpit" (Quick Links to Management, Production, Knowledge)
+        # 3. Quick Actions
 
-        links = [
-            ("Projects", "Add Project"),
-            ("Tasks", "Add Task"),
-            ("Meetings", "Add Meeting"),
-            ("Finance", "Add Finance")
+        # Helper to get URL
+        def get_url(name):
+            return self.db_urls.get(name, "#")
+
+        # --- Section 1: Hero ---
+        hero_block = [
+            {
+                "type": "heading_2",
+                "heading_2": {
+                    "rich_text": [{"text": {"content": "👋 Welcome back, Agency Owner"}}],
+                    "color": "default"
+                }
+            },
+            {
+                "type": "quote",
+                "quote": {
+                    "rich_text": [{"text": {"content": "Design is not just what it looks like and feels like. Design is how it works."}}],
+                    "color": "gray_background"
+                }
+            },
+            {"type": "divider", "divider": {}}
         ]
 
-        columns = []
-        for db_name, label in links:
-            url = self.db_urls.get(db_name, "#")
-            # Create a callout in a column
-            columns.append({
-                "type": "column",
-                "column": {
-                    "children": [
-                        {
-                            "type": "callout",
-                            "callout": {
-                                "rich_text": [{"text": {"content": label, "link": {"url": url}}}],
-                                "icon": {"emoji": self.schema[db_name]["icon"]["emoji"]},
-                                "color": "gray_background"
-                            }
-                        }
-                    ]
-                }
-            })
+        # --- Section 2: The Cockpit (3 Columns) ---
 
-        quick_links_block = {
+        # Col 1: Management
+        col1_children = [
+            {"type": "heading_3", "heading_3": {"rich_text": [{"text": {"content": "🏢 Management"}}], "color": "blue"}},
+            self.create_nav_link("Clients", "👥 Client Base"),
+            self.create_nav_link("Finance", "💰 Finance"),
+            self.create_nav_link("Services", "🏷️ Services"),
+            self.create_nav_link("Team", "👤 Team directory"),
+        ]
+
+        # Col 2: Production
+        col2_children = [
+            {"type": "heading_3", "heading_3": {"rich_text": [{"text": {"content": "🔨 Production"}}], "color": "orange"}},
+            self.create_nav_link("Projects", "💼 Active Projects"),
+            self.create_nav_link("Tasks", "✅ Task Board"),
+            self.create_nav_link("Content Calendar", "🗓️ Content"),
+        ]
+
+        # Col 3: Knowledge
+        col3_children = [
+            {"type": "heading_3", "heading_3": {"rich_text": [{"text": {"content": "🧠 Knowledge"}}], "color": "purple"}},
+            self.create_nav_link("SOPs", "📚 SOP Library"),
+            self.create_nav_link("Resources", "🛠️ Tools & Resources"),
+            self.create_nav_link("Assets", "🎨 Brand Assets"),
+            self.create_nav_link("Meetings", "📅 Meeting Notes"),
+        ]
+
+        cockpit_block = {
             "type": "column_list",
             "column_list": {
-                "children": columns
-            }
-        }
-
-        # 2. Team Members Header
-        team_header = {
-            "type": "heading_2",
-            "heading_2": {
-                "rich_text": [{"text": {"content": "Team Members"}}],
-                "color": "blue"
-            }
-        }
-
-        # 3. Link to Team DB (since we can't do inline gallery easily, we provide a clean link)
-        team_link = {
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": "👥 Open Team Database", "link": {"url": self.db_urls.get("Team", "#")}}}
+                "children": [
+                    {"type": "column", "column": {"children": col1_children}},
+                    {"type": "column", "column": {"children": col2_children}},
+                    {"type": "column", "column": {"children": col3_children}}
                 ]
             }
         }
 
-        children = [
-            {"type": "heading_3", "heading_3": {"rich_text": [{"text": {"content": "Quick Links"}, "color": "blue"}]}},
-            {
-                "type": "divider",
-                "divider": {}
-            },
-            quick_links_block,
-            {
-                "type": "divider",
-                "divider": {}
-            },
-            team_header,
-            team_link
-        ]
+        # --- Section 3: Quick Actions (Callouts) ---
+        actions_header = {
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "⚡ Quick Actions"}}], "color": "yellow"}
+        }
+
+        # For quick actions, we usually want to open the database to add a new item.
+        # Ideally, we'd have a button, but API cannot create buttons.
+        # We'll use callouts that look like buttons.
+
+        action_cols = {
+            "type": "column_list",
+            "column_list": {
+                "children": [
+                    {"type": "column", "column": {"children": [
+                        self.create_callout("New Project", "💼", get_url("Projects"))
+                    ]}},
+                    {"type": "column", "column": {"children": [
+                        self.create_callout("New Task", "✅", get_url("Tasks"))
+                    ]}},
+                    {"type": "column", "column": {"children": [
+                        self.create_callout("New Client", "👤", get_url("Clients"))
+                    ]}},
+                    {"type": "column", "column": {"children": [
+                        self.create_callout("New Invoice", "📄", get_url("Finance"))
+                    ]}},
+                ]
+            }
+        }
+
+        children = hero_block + [cockpit_block, {"type": "divider", "divider": {}}, actions_header, action_cols]
 
         try:
-            # We insert these at the TOP of the page (or append)
-            # Since the subpages created earlier are just links at the bottom (or hidden if we used a parent page?)
-            # create_database(parent=page_id) appends links to the bottom.
-            # If we append dashboard now, it will be at the very bottom.
-            # Ideally we want Dashboard at top.
-            # We can't prepend blocks easily.
-            # But the user sees the page.
-            # I will append them. It's the best I can do.
             self.api.append_children(self.main_page_id, children)
-            print("✅ Dashboard elements added.")
+            print("✅ Dashboard layout applied.")
         except Exception as e:
-            print(f"❌ Failed to add dashboard elements: {e}")
+            print(f"❌ Failed to build dashboard: {e}")
+
+    def create_nav_link(self, db_name, label):
+        url = self.db_urls.get(db_name, "#")
+        return {
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {"text": {"content": label, "link": {"url": url}}}
+                ]
+            }
+        }
+
+    def create_callout(self, text, emoji, url):
+        return {
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"text": {"content": text, "link": {"url": url}}}],
+                "icon": {"emoji": emoji},
+                "color": "gray_background"
+            }
+        }
 
 if __name__ == "__main__":
     key = os.environ.get("NOTION_KEY")
